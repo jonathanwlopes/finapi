@@ -12,7 +12,7 @@ interface Customer {
   statement: StatementOperation[]
 }
 
-const customers: Customer[] = []
+let customers: Customer[] = []
 
 interface CustomRequest extends Request {
   customer?: Customer
@@ -61,12 +61,14 @@ app.post("/account", (request, response) => {
     return response.status(400).json({ error: "Customer already exists!" })
   }
 
-  customers.push({
+  const newAccount = {
     cpf,
     name,
     id: uuidv4(),
     statement: [],
-  })
+  }
+
+  customers = [...customers, newAccount]
 
   return response.status(201).send()
 })
@@ -126,6 +128,63 @@ app.post("/withdraw", verifyIfExistsAccountCPF, (request: CustomRequest, respons
   customer.statement.push(statementOperation)
 
   return response.status(201).send()
+})
+
+app.get("/statement/date", verifyIfExistsAccountCPF, (request: CustomRequest, response) => {
+  const { date } = request.query
+  const { customer } = request
+
+  if (!customer) {
+    return response.status(400).send()
+  }
+
+  const dateFormat = new Date(date + " 00:00")
+
+  const statement = customer.statement.filter((statement) => statement.createdAt.toDateString() === new Date(dateFormat).toDateString())
+
+  return response.json(statement)
+})
+
+app.put("/account", verifyIfExistsAccountCPF, (request: CustomRequest, response) => {
+  const { name } = request.body
+  const { customer } = request
+
+  if (!customer) return response.status(400).send()
+
+  customer.name = name
+
+  return response.status(201).send()
+})
+
+app.get("/account", verifyIfExistsAccountCPF, (request: CustomRequest, response) => {
+  const { customer } = request
+
+  if (!customer) return response.status(400).send()
+
+  return response.json(customer)
+})
+
+app.delete("/account", verifyIfExistsAccountCPF, (request: CustomRequest, response) => {
+  const { customer } = request
+  const { cpf } = request.headers
+
+  if (!customer) return response.status(400).send()
+
+  const updatedAccounts = customers.filter((customer) => customer.cpf !== cpf)
+
+  customers = [...updatedAccounts]
+
+  return response.status(200).send(customers)
+})
+
+app.get("/balance", verifyIfExistsAccountCPF, (request: CustomRequest, response) => {
+  const { customer } = request
+
+  if (!customer) return response.status(400).send()
+
+  const balance = getBalance(customer.statement)
+
+  return response.json(balance)
 })
 
 app.listen(PORT, () => console.log("Server is running..."))
